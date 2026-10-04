@@ -24,6 +24,12 @@
       </span>
     </p>
 
+    <p class="ledger-line" :class="{ 'ledger-bad': !ledger.matched }">
+      待派发台账：告警转单累计 {{ ledger.defectFromAlarm }} 条 · 其中待派发
+      {{ ledger.pendingDispatch }} 条 · 告警侧已转 {{ ledger.alarmTransferred }} 条，
+      {{ ledger.matched ? '两处条数对得上' : '两处条数对不上，请核查' }}
+    </p>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -38,6 +44,7 @@
         <tr>
           <th v-for="column in columns" :key="column">{{ column }}</th>
           <th>当前状态</th>
+          <th>来源告警</th>
           <th>可执行动作</th>
         </tr>
       </thead>
@@ -45,6 +52,7 @@
         <tr v-for="row in rows" :key="String(row.id)">
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
+          <td>{{ row['来源告警编号'] ?? '—' }}</td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -58,7 +66,7 @@
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 2" class="empty-state">暂无缺陷消缺数据，可先登记消缺任务</td>
+          <td :colspan="columns.length + 3" class="empty-state">暂无缺陷消缺数据，可先登记消缺任务</td>
         </tr>
       </tbody>
     </table>
@@ -78,8 +86,9 @@ import {
   listEntries,
   moduleMeta,
   runAction as applyAction,
+  transferLedger,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import type { EntryRow, TransferLedger } from '@/data/types'
 
 const meta = moduleMeta('defect')
 const columns = ["缺陷编号", "缺陷类别", "发现方式", "严重等级", "责任班组", "要求完成日", "消缺措施", "消缺状态"]
@@ -92,6 +101,7 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const ledger = ref<TransferLedger>({ alarmTransferred: 0, defectFromAlarm: 0, pendingDispatch: 0, matched: true })
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +138,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    ledger.value = transferLedger()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '缺陷消缺列表读取失败'
   }

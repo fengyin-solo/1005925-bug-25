@@ -41,11 +41,17 @@ export function listRows(key: string): EntryRow[] {
 }
 
 export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
-  cache = next
+  saveModules({ [key]: rows })
+}
+
+// 一次写多个模块：整份数据序列化后只落一次库，写库成功才换缓存。
+// 转缺陷单这类「一次落两处」的动作靠它保证要么都落、要么都不落。
+export function saveModules(patch: Record<string, EntryRow[]>): void {
+  const next = { ...allRows(), ...patch }
   if (typeof window !== 'undefined' && window.localStorage) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   }
+  cache = next
 }
 
 export function resetRows(key: string): EntryRow[] {

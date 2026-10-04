@@ -68,4 +68,8 @@ npm run build
 - 字段、状态、动作与流转目标集中在 `frontend/src/data/modules.ts`；示例数据在
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
+- 告警转缺陷单是一次落两处的动作：`transferAlarmsToDefects` 把告警状态与缺陷单号一起写，
+  落库不成功整笔退回；只认处置人本人、只认「处理中」的告警，重复提交只认头一回；
+  转出的缺陷单落入缺陷消缺的待派发台账，两处已转条数用 `transferLedger` 对账。
 - 想回到初始数据：清掉浏览器里 `pv-plant-ops:entries` 这一项，或调用 `resetModule(模块)`。
+- 转单逻辑有冒烟测试：`cd frontend && npm test`（node 里跑，不依赖浏览器）。
