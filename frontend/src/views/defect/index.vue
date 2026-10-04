@@ -18,6 +18,12 @@
       </article>
     </div>
 
+    <p v-if="recon" class="recon-line">
+      待派发台账：告警转单已收 {{ recon.defectReceived }} 条 · 告警侧已转缺陷 {{ recon.alarmTransferred }} 条 ·
+      <span v-if="recon.consistent" class="ok-text">两处条数对得上</span>
+      <span v-else class="error-text">对不上：{{ recon.problems.join('；') || '条数不一致' }}</span>
+    </p>
+
     <p class="status-legend">
       <span v-for="item in statusSummary" :key="item.status" class="legend-item">
         {{ item.status }}：{{ item.count }}
@@ -43,7 +49,7 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">{{ row[column] || '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
@@ -77,21 +83,38 @@ import {
   downloadEntries,
   listEntries,
   moduleMeta,
+  transferReconciliation,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import type { EntryRow, TransferReconciliation } from '@/data/types'
 
 const meta = moduleMeta('defect')
-const columns = ["缺陷编号", "缺陷类别", "发现方式", "严重等级", "责任班组", "要求完成日", "消缺措施", "消缺状态"]
+const columns = ["缺陷编号", "缺陷类别", "发现方式", "严重等级", "责任班组", "要求完成日", "消缺措施", "消缺状态", "来源告警"]
 const actions = ["派发消缺", "提交验收", "确认闭环"]
 const statuses = ["待派发", "消缺中", "待验收", "已闭环"]
-const stats = [{"label": "待派发缺陷", "value": 0}, {"label": "消缺中缺陷", "value": 0}, {"label": "超期未闭环", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const recon = ref<TransferReconciliation | null>(null)
+
+const stats = computed(() => {
+  const today = new Date()
+  const todayText = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  return [
+    { label: '待派发缺陷', value: rows.value.filter((row) => String(row.status) === '待派发').length },
+    { label: '消缺中缺陷', value: rows.value.filter((row) => String(row.status) === '消缺中').length },
+    {
+      label: '超期未闭环',
+      value: rows.value.filter(
+        (row) => String(row.status) !== '已闭环' && String(row.要求完成日 ?? '') < todayText,
+      ).length,
+    },
+  ]
+})
+
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +151,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    recon.value = transferReconciliation()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '缺陷消缺列表读取失败'
   }

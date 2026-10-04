@@ -41,11 +41,17 @@ export function listRows(key: string): EntryRow[] {
 }
 
 export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
-  cache = next
+  saveAll({ ...allRows(), [key]: rows })
+}
+
+// 一次落多处：转缺陷单这类跨模块写入必须整笔成功，任一环节失败都不动现有数据。
+// 先序列化、写 localStorage，全部成功后才换内存缓存；中途抛错就当没发生过。
+export function saveAll(next: Record<string, EntryRow[]>): void {
+  const payload = JSON.stringify(next)
   if (typeof window !== 'undefined' && window.localStorage) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    window.localStorage.setItem(STORAGE_KEY, payload)
   }
+  cache = next
 }
 
 export function resetRows(key: string): EntryRow[] {

@@ -85,3 +85,6 @@ desktop.ini
 *.db
 *.pid
 *.seed
+
+# ===== 校验脚本临时产物 =====
+scripts/.*.bundle.mjs
